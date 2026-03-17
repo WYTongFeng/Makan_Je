@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "177312130045",
+    "project_id": "makan-je-app",
+    "storage_bucket": "makan-je-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:177312130045:android:7018217277513bbc33ef94",
+        "android_client_info": {
+          "package_name": "com.example.makanjeapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCO3w1ewa2zYzro7Pyi9YDrp4JaJltMcb0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
