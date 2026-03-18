@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'views/manager/menu_mgmt_view.dart';
+import 'core/theme/app_theme.dart';
+import 'views/customer/menu_view.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized before calling Firebase
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase
   await Firebase.initializeApp();
 
@@ -26,8 +28,55 @@ class MakanJeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Makan Je',
-      theme: ThemeData(primarySwatch: Colors.orange), // Your F9943B orange
-      home: MenuMgmtView(), // Change this line to load your new screen
+      theme: AppTheme.lightTheme,
+      home: DevHomeScreen(),
+    );
+  }
+}
+
+class DevHomeScreen extends StatelessWidget {
+  const DevHomeScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Makan Je - Developer navigation page')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: () {
+                // Jump to Jin Jie's customer menu page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MenuView()),
+                );
+              },
+              child: const Text('👨‍🍳 Jin Jie: Customer Visual Menu'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                // Jump to Zi Yee's manager console
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => MenuMgmtView()),
+                );
+              },
+              child: const Text('👔 Zi Yee: Manager Dashboard'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                // Redirecting to Ayaan's login page
+                // Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+              },
+              child: const Text('📝 Ayaan: Login / Registration'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
