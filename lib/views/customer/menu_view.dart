@@ -206,16 +206,25 @@ class _MenuViewState extends State<MenuView> {
     );
   }
 
-  void _navigateToCart() {
-    Navigator.push(
+  // Updated navigation method to handle returning data from CartView
+  Future<void> _navigateToCart() async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CartView(cartItems: _currentCart),
       ),
-    ).then((_) {
-      // Refresh UI in case cart items were modified in CartView
+    );
+
+    // If the result is true, it means the order was placed successfully
+    if (result == true) {
+      setState(() {
+        _currentCart.clear(); // Empty the cart
+      });
+    } else {
+      // If result is null (user just pressed back button), simply refresh the UI
+      // in case they modified item quantities inside the cart
       setState(() {});
-    });
+    }
   }
 
   @override

@@ -1,6 +1,7 @@
 // Path: lib/views/customer/split_bill_view.dart
 
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart'; // Imported the new QR package
 import '../../models/cart_item_model.dart';
 
 class SplitBillView extends StatefulWidget {
@@ -18,20 +19,15 @@ class SplitBillView extends StatefulWidget {
 }
 
 class _SplitBillViewState extends State<SplitBillView> {
-  // State for 'Split Equally' tab
   int _splitCount = 2;
-
-  // State for 'Pay by Item' tab
   late List<bool> _selectedItems;
 
   @override
   void initState() {
     super.initState();
-    // Initialize all items as unselected for the 'Pay by Item' feature
     _selectedItems = List.generate(widget.cartItems.length, (index) => false);
   }
 
-  // Calculate the total for specifically selected items
   double _calculateSelectedItemsTotal() {
     double total = 0.0;
     for (int i = 0; i < widget.cartItems.length; i++) {
@@ -44,7 +40,6 @@ class _SplitBillViewState extends State<SplitBillView> {
 
   @override
   Widget build(BuildContext context) {
-    // Using DefaultTabController to manage the two split methods
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -64,7 +59,6 @@ class _SplitBillViewState extends State<SplitBillView> {
     );
   }
 
-  // --- Tab 1: Split Equally ---
   Widget _buildSplitEquallyTab() {
     final double amountPerPerson = widget.grandTotal / _splitCount;
 
@@ -156,7 +150,6 @@ class _SplitBillViewState extends State<SplitBillView> {
     );
   }
 
-  // --- Tab 2: Pay by Item ---
   Widget _buildPayByItemTab() {
     final double myTotal = _calculateSelectedItemsTotal();
 
@@ -241,7 +234,7 @@ class _SplitBillViewState extends State<SplitBillView> {
     );
   }
 
-  // Reusable button for both tabs to proceed to payment/QR generation
+  // --- Updated QR Generation Logic ---
   Widget _buildGenerateQRButton(double amountToPay) {
     return SizedBox(
       width: double.infinity,
@@ -249,18 +242,79 @@ class _SplitBillViewState extends State<SplitBillView> {
       child: ElevatedButton(
         onPressed: amountToPay > 0
             ? () {
-                // TODO: Generate QR Code for counter scanning
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Generating QR for RM ${amountToPay.toStringAsFixed(2)}...',
-                    ),
-                  ),
-                );
+                _showQRDialog(
+                  amountToPay,
+                ); // Call the dialog method instead of SnackBar
               }
             : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Theme.of(context).primaryColor,
+          foregroundColor: Colors.white,
+        ),
         child: const Text('Generate Pay QR'),
       ),
+    );
+  }
+
+  // Method to display the QR Code in a popup dialog
+  void _showQRDialog(double amount) {
+    // Generate a formatted string to embed in the QR code
+    final String qrData = 'MakanJe_Pay_RM_${amount.toStringAsFixed(2)}';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          title: const Text(
+            'Scan at Counter',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Show this QR code to the cashier to pay your portion.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24.0),
+              // Wrap QrImageView with a SizedBox to provide explicit dimensions.
+              // This prevents the LayoutBuilder intrinsic dimension exception inside AlertDialog.
+              SizedBox(
+                width: 200.0,
+                height: 200.0,
+                child: QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 200.0,
+                  backgroundColor: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 24.0),
+              Text(
+                'RM ${amount.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 28.0,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).primaryColor,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Close', style: TextStyle(fontSize: 16.0)),
+            ),
+          ],
+        );
+      },
     );
   }
 }

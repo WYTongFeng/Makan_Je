@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import '../../models/cart_item_model.dart';
 import 'split_bill_view.dart';
+import '../../models/order_model.dart';
+import '../../data/services/database_service.dart';
 
 class CartView extends StatefulWidget {
   // Passing mock cart items for UI testing
@@ -191,9 +193,70 @@ class _CartViewState extends State<CartView> {
                 Expanded(
                   flex: 2,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Implement Place Order logic to Firebase
-                    },
+                    onPressed: widget.cartItems.isEmpty
+                        ? null // Disable button if cart is empty
+                        : () async {
+                            try {
+                              // 1. Convert CartItems to OrderItems
+                              final List<OrderItem> orderItems = widget
+                                  .cartItems
+                                  .map((cartItem) {
+                                    return OrderItem(
+                                      itemId: cartItem.menuItem.itemId,
+                                      name: cartItem.menuItem.nameEn,
+                                      quantity: cartItem.quantity,
+                                      priceAtTimeOfOrder:
+                                          cartItem.menuItem.price,
+                                      specialRemarks: cartItem.specialRemarks,
+                                    );
+                                  })
+                                  .toList();
+
+                              // 2. Construct the OrderModel
+                              final newOrder = OrderModel(
+                                orderId:
+                                    '', // Firebase will generate the actual ID
+                                tableNumber:
+                                    1, // Mock table number, normally obtained from scanning a table QR
+                                status: 'pending', // Kitchen will see 'pending'
+                                createdAt: DateTime.now(),
+                                totalAmount: _calculateGrandTotal(),
+                                splitType: 'none',
+                                items: orderItems,
+                              );
+
+                              // 3. Send to Firebase
+                              final dbService = DatabaseService();
+                              await dbService.placeOrder(newOrder);
+
+                              // 4. Show success message and navigate back to Menu
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Order sent to kitchen successfully!',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                                // Pop the CartView to return to the MenuView
+                                Navigator.pop(context, true);
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Failed to place order: $e',
+                                    ), // 移除了斜杠
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                              // Print the error to VS Code Debug Console
+                              print('Firebase Exception: $e');
+                            }
+                          },
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14.0),
                       backgroundColor: Theme.of(context).primaryColor,
