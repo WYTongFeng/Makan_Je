@@ -3,15 +3,18 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart'; // Imported the new QR package
 import '../../models/cart_item_model.dart';
+import '../../data/services/database_service.dart';
 
 class SplitBillView extends StatefulWidget {
   final List<CartItemModel> cartItems;
   final double grandTotal;
+  final List<String> orderIds;
 
   const SplitBillView({
     Key? key,
     required this.cartItems,
     required this.grandTotal,
+    required this.orderIds,
   }) : super(key: key);
 
   @override
@@ -310,7 +313,41 @@ class _SplitBillViewState extends State<SplitBillView> {
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('Close', style: TextStyle(fontSize: 16.0)),
+              child: const Text(
+                'Close',
+                style: TextStyle(fontSize: 16.0, color: Colors.grey),
+              ),
+            ),
+            // THE NEW DEMO BUTTON
+            ElevatedButton(
+              onPressed: () async {
+                final dbService = DatabaseService();
+
+                // Update all unpaid orders in this bill to 'paid' in Firebase
+                for (String orderId in widget.orderIds) {
+                  await dbService.updateOrderStatus(orderId, 'paid');
+                }
+
+                if (context.mounted) {
+                  Navigator.of(dialogContext).pop(); // Close dialog
+                  Navigator.pop(
+                    context,
+                    true,
+                  ); // Return to Menu and signal success
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Payment Successful! Thank you.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text(
+                'Simulate Payment',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );

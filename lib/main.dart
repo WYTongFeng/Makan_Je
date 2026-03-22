@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'views/manager/menu_mgmt_view.dart';
 import 'core/theme/app_theme.dart';
 import 'views/customer/menu_view.dart';
+import 'views/staff/kds_view.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized before calling Firebase
@@ -45,34 +46,59 @@ class DevHomeScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // 1. Customer Menu (Restored)
             ElevatedButton(
               onPressed: () {
-                // Jump to Jin Jie's customer menu page
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const MenuView()),
                 );
               },
-              child: const Text('👨‍🍳 Jin Jie: Customer Visual Menu'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Jin Jie: Customer Menu'),
             ),
             const SizedBox(height: 20),
+
+            // 2. Kitchen KDS
             ElevatedButton(
               onPressed: () {
-                // Jump to Zi Yee's manager console
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const KdsView()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey[800],
+              ),
+              child: const Text(
+                'Jin Jie: Kitchen KDS',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 3. Manager Dashboard
+            ElevatedButton(
+              onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => MenuMgmtView()),
                 );
               },
-              child: const Text('👔 Zi Yee: Manager Dashboard'),
+              child: const Text('Zi Yee: Manager Dashboard'),
             ),
             const SizedBox(height: 20),
+
+            // 4. Login / Registration
             ElevatedButton(
               onPressed: () {
                 // Redirecting to Ayaan's login page
                 // Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
               },
-              child: const Text('📝 Ayaan: Login / Registration'),
+              child: const Text('Ayaan: Login / Registration'),
             ),
           ],
         ),

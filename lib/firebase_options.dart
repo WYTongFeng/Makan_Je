@@ -7,51 +7,31 @@ import 'package:flutter/foundation.dart'
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
 /// Example:
-/// ```dart
+///
 /// import 'firebase_options.dart';
 /// // ...
 /// await Firebase.initializeApp(
 ///   options: DefaultFirebaseOptions.currentPlatform,
 /// );
-/// ```
+///
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
+    // If you are testing on Chrome/Web browser,
+    // we will force it to use your Android API keys to connect!
     if (kIsWeb) {
-      return web;
+      return android;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        return ios;
       case TargetPlatform.macOS:
-        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
-      default:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions are not supported for this platform.',
-        );
+      case TargetPlatform.fuchsia:
+        return android; // Fallback for debugging, though properly we should run CLI
     }
   }
-
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAebphZ3XxIhI4s0gWjpgNKt_HMA4Hq5aM',
-    appId: '1:177312130045:web:02045ca780cd989733ef94',
-    messagingSenderId: '177312130045',
-    projectId: 'makan-je-app',
-    authDomain: 'makan-je-app.firebaseapp.com',
-    storageBucket: 'makan-je-app.firebasestorage.app',
-    measurementId: 'G-4SK3QKCX1C',
-  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCO3w1ewa2zYzro7Pyi9YDrp4JaJltMcb0',
@@ -59,23 +39,5 @@ class DefaultFirebaseOptions {
     messagingSenderId: '177312130045',
     projectId: 'makan-je-app',
     storageBucket: 'makan-je-app.firebasestorage.app',
-  );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCB0iKk9KE98qJ47RxKXhAOgLx-756fEh4',
-    appId: '1:177312130045:ios:79f1f9ca9693d4a933ef94',
-    messagingSenderId: '177312130045',
-    projectId: 'makan-je-app',
-    storageBucket: 'makan-je-app.firebasestorage.app',
-    iosBundleId: 'com.example.makanjeapp',
-  );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCB0iKk9KE98qJ47RxKXhAOgLx-756fEh4',
-    appId: '1:177312130045:ios:79f1f9ca9693d4a933ef94',
-    messagingSenderId: '177312130045',
-    projectId: 'makan-je-app',
-    storageBucket: 'makan-je-app.firebasestorage.app',
-    iosBundleId: 'com.example.makanjeapp',
   );
 }

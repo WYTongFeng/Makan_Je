@@ -160,112 +160,77 @@ class _CartViewState extends State<CartView> {
                 ),
               ],
             ),
-            const SizedBox(height: 16.0),
-            Row(
-              children: [
-                // Split Bill Button (Left)
-                Expanded(
-                  flex: 1,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SplitBillView(
-                            cartItems: widget.cartItems,
-                            grandTotal: grandTotal,
-                          ),
-                        ),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14.0),
-                      side: BorderSide(color: Theme.of(context).primaryColor),
-                    ),
-                    child: Text(
-                      'Split Bill',
-                      style: TextStyle(color: Theme.of(context).primaryColor),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12.0),
-                // Place Order Button (Right)
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: widget.cartItems.isEmpty
-                        ? null // Disable button if cart is empty
-                        : () async {
-                            try {
-                              // 1. Convert CartItems to OrderItems
-                              final List<OrderItem> orderItems = widget
-                                  .cartItems
-                                  .map((cartItem) {
-                                    return OrderItem(
-                                      itemId: cartItem.menuItem.itemId,
-                                      name: cartItem.menuItem.nameEn,
-                                      quantity: cartItem.quantity,
-                                      priceAtTimeOfOrder:
-                                          cartItem.menuItem.price,
-                                      specialRemarks: cartItem.specialRemarks,
-                                    );
-                                  })
-                                  .toList();
-
-                              // 2. Construct the OrderModel
-                              final newOrder = OrderModel(
-                                orderId:
-                                    '', // Firebase will generate the actual ID
-                                tableNumber:
-                                    1, // Mock table number, normally obtained from scanning a table QR
-                                status: 'pending', // Kitchen will see 'pending'
-                                createdAt: DateTime.now(),
-                                totalAmount: _calculateGrandTotal(),
-                                splitType: 'none',
-                                items: orderItems,
-                              );
-
-                              // 3. Send to Firebase
-                              final dbService = DatabaseService();
-                              await dbService.placeOrder(newOrder);
-
-                              // 4. Show success message and navigate back to Menu
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Order sent to kitchen successfully!',
-                                    ),
-                                    backgroundColor: Colors.green,
-                                  ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: widget.cartItems.isEmpty
+                    ? null
+                    : () async {
+                        try {
+                          // 1. Convert CartItems to OrderItems
+                          final List<OrderItem> orderItems = widget.cartItems
+                              .map((cartItem) {
+                                return OrderItem(
+                                  itemId: cartItem.menuItem.itemId,
+                                  name: cartItem.menuItem.nameEn,
+                                  quantity: cartItem.quantity,
+                                  priceAtTimeOfOrder: cartItem.menuItem.price,
+                                  specialRemarks: cartItem.specialRemarks,
                                 );
-                                // Pop the CartView to return to the MenuView
-                                Navigator.pop(context, true);
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Failed to place order: $e',
-                                    ), // 移除了斜杠
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                              // Print the error to VS Code Debug Console
-                              print('Firebase Exception: $e');
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14.0),
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Place Order'),
-                  ),
+                              })
+                              .toList();
+
+                          // 2. Construct the OrderModel
+                          final newOrder = OrderModel(
+                            orderId: '', // Firebase will generate the actual ID
+                            tableNumber: 1, // Mock table number
+                            status: 'pending',
+                            createdAt: DateTime.now(),
+                            totalAmount: _calculateGrandTotal(),
+                            splitType: 'none',
+                            items: orderItems,
+                          );
+
+                          // 3. Send to Firebase and get the generated ID
+                          final dbService = DatabaseService();
+                          final String generatedOrderId = await dbService
+                              .placeOrder(newOrder);
+
+                          // 4. Show success message and navigate back to Menu
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Order sent to kitchen successfully!',
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                            // Return the specific order ID to the MenuView
+                            Navigator.pop(context, generatedOrderId);
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to place order: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                          print('Firebase Exception: $e');
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14.0),
+                  backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
                 ),
-              ],
+                child: const Text(
+                  'Place Order',
+                  style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
           ],
         ),

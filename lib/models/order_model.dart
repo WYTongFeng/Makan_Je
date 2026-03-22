@@ -37,7 +37,7 @@ class OrderItem {
 }
 
 class OrderModel {
-  final String orderId;
+  String orderId;
   final int tableNumber;
   String status; // 'pending', 'cooking', 'ready', 'paid'
   final DateTime createdAt;

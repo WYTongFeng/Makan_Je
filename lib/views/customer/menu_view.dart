@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../models/menu_item_model.dart';
 import '../../models/cart_item_model.dart';
 import 'cart_view.dart';
+import 'split_bill_view.dart';
+import '../../data/services/database_service.dart';
 
 class MenuView extends StatefulWidget {
   const MenuView({Key? key}) : super(key: key);
@@ -13,36 +15,19 @@ class MenuView extends StatefulWidget {
 }
 
 class _MenuViewState extends State<MenuView> {
-  // Upgraded mock data using the actual MenuItemModel structure
-  final List<MenuItemModel> mockMenuItems = [
-    MenuItemModel(
-      itemId: 'm1',
-      nameEn: 'Nasi Lemak Ayam',
-      nameMy: 'Nasi Lemak Ayam Berempah',
-      description: 'Classic coconut rice with fried chicken',
-      price: 15.90,
-      category: 'Main',
-      imageUrl: 'https://via.placeholder.com/300',
-      allergens: ['Peanut', 'Egg'],
-      customizationOptions: ['More Sambal', 'No Peanut'],
-    ),
-    MenuItemModel(
-      itemId: 'm2',
-      nameEn: 'Mee Goreng Mamak',
-      nameMy: 'Mee Goreng Mamak',
-      description: 'Spicy fried noodles',
-      price: 10.50,
-      category: 'Main',
-      imageUrl: 'https://via.placeholder.com/300',
-      allergens: ['Gluten', 'Egg'],
-      customizationOptions: ['Extra Spicy', 'Less Spicy', 'Vegetarian'],
-    ),
-  ];
+  // Initialize DatabaseService to fetch real-time data
+  final DatabaseService _dbService = DatabaseService();
 
   // Temporary local state to hold cart items before State Management is implemented
   final List<CartItemModel> _currentCart = [];
 
-  // 1. Updated _addToCart to accept quantity
+  // State to hold placed orders that haven't been paid yet
+  final List<CartItemModel> _unpaidBill = [];
+
+  // State to hold the IDs of the unpaid orders in Firebase
+  final List<String> _unpaidOrderIds = [];
+
+  // Add item to cart with quantity
   void _addToCart(
     MenuItemModel item,
     List<String> selectedRemarks,
@@ -51,8 +36,9 @@ class _MenuViewState extends State<MenuView> {
     setState(() {
       final existingItemIndex = _currentCart.indexWhere((cartItem) {
         if (cartItem.menuItem.itemId != item.itemId) return false;
-        if (cartItem.specialRemarks.length != selectedRemarks.length)
+        if (cartItem.specialRemarks.length != selectedRemarks.length) {
           return false;
+        }
         for (var i = 0; i < selectedRemarks.length; i++) {
           if (cartItem.specialRemarks[i] != selectedRemarks[i]) return false;
         }
@@ -60,10 +46,8 @@ class _MenuViewState extends State<MenuView> {
       });
 
       if (existingItemIndex >= 0) {
-        // Add the selected quantity to the existing cart item
         _currentCart[existingItemIndex].quantity += quantity;
       } else {
-        // Add new item with the specified quantity
         _currentCart.add(
           CartItemModel(
             menuItem: item,
@@ -82,10 +66,10 @@ class _MenuViewState extends State<MenuView> {
     );
   }
 
-  // 2. Updated Bottom Sheet with Quantity Selector
+  // Show bottom sheet for customization and quantity
   void _showCustomizationSheet(MenuItemModel item) {
     List<String> tempSelectedRemarks = [];
-    int tempQuantity = 1; // Local state for quantity
+    int tempQuantity = 1;
 
     showModalBottomSheet(
       context: context,
@@ -110,7 +94,6 @@ class _MenuViewState extends State<MenuView> {
                   ),
                   const SizedBox(height: 16.0),
 
-                  // Remarks Section
                   if (item.customizationOptions.isNotEmpty) ...[
                     const Text('Select your preferences:'),
                     const SizedBox(height: 8.0),
@@ -140,7 +123,6 @@ class _MenuViewState extends State<MenuView> {
                     const SizedBox(height: 16.0),
                   ],
 
-                  // Quantity Selector Section
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -185,7 +167,6 @@ class _MenuViewState extends State<MenuView> {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(sheetContext);
-                        // Pass both remarks and quantity to the updated method
                         _addToCart(item, tempSelectedRemarks, tempQuantity);
                       },
                       style: ElevatedButton.styleFrom(
@@ -206,7 +187,7 @@ class _MenuViewState extends State<MenuView> {
     );
   }
 
-  // Updated navigation method to handle returning data from CartView
+  // Navigate to Cart and handle returned order ID
   Future<void> _navigateToCart() async {
     final result = await Navigator.push(
       context,
@@ -215,16 +196,45 @@ class _MenuViewState extends State<MenuView> {
       ),
     );
 
-    // If the result is true, it means the order was placed successfully
-    if (result == true) {
+    // If result is a String, it means the order was placed and we got an ID back
+    if (result is String) {
       setState(() {
-        _currentCart.clear(); // Empty the cart
+        _unpaidBill.addAll(_currentCart);
+        _unpaidOrderIds.add(result); // Save the order ID
+        _currentCart.clear();
       });
     } else {
-      // If result is null (user just pressed back button), simply refresh the UI
-      // in case they modified item quantities inside the cart
       setState(() {});
     }
+  }
+
+  // Navigate directly to the Split Bill view using the unpaid bill items
+  void _navigateToSplitBill() {
+    if (_unpaidBill.isEmpty) return;
+
+    double totalBill = 0.0;
+    for (var item in _unpaidBill) {
+      totalBill += item.totalPrice;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SplitBillView(
+          cartItems: _unpaidBill,
+          grandTotal: totalBill,
+          orderIds: _unpaidOrderIds,
+        ),
+      ),
+    ).then((isPaid) {
+      // If payment was successful, clear the local bill UI
+      if (isPaid == true) {
+        setState(() {
+          _unpaidBill.clear();
+          _unpaidOrderIds.clear();
+        });
+      }
+    });
   }
 
   @override
@@ -236,6 +246,14 @@ class _MenuViewState extends State<MenuView> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
+          // Receipt / Unpaid Bill Icon
+          if (_unpaidBill.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.receipt_long, color: Colors.green),
+              onPressed: _navigateToSplitBill,
+              tooltip: 'View Bill & Pay',
+            ),
+
           Stack(
             alignment: Alignment.center,
             children: [
@@ -267,25 +285,64 @@ class _MenuViewState extends State<MenuView> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 0.75,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-          ),
-          itemCount: mockMenuItems.length,
-          itemBuilder: (context, index) {
-            final item = mockMenuItems[index];
-            return _buildMenuCard(context, item);
-          },
-        ),
+      // StreamBuilder to fetch real-time menu data
+      body: StreamBuilder<List<MenuItemModel>>(
+        stream: _dbService.getMenuItemsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).primaryColor,
+              ),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Text(
+                  'Error loading menu: \n${snapshot.error}',
+                  style: const TextStyle(color: Colors.red, fontSize: 16.0),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
+          final menuItems = snapshot.data ?? [];
+
+          if (menuItems.isEmpty) {
+            return const Center(
+              child: Text(
+                'Menu is currently empty.',
+                style: TextStyle(fontSize: 18.0, color: Colors.grey),
+              ),
+            );
+          }
+
+          return Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.75,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              itemCount: menuItems.length,
+              itemBuilder: (context, index) {
+                final item = menuItems[index];
+                return _buildMenuCard(context, item);
+              },
+            ),
+          );
+        },
       ),
     );
   }
 
+  // Build individual menu card
   Widget _buildMenuCard(BuildContext context, MenuItemModel item) {
     return Card(
       elevation: 3,
@@ -336,8 +393,6 @@ class _MenuViewState extends State<MenuView> {
                     width: double.infinity,
                     height: 32,
                     child: ElevatedButton(
-                      // Call _showCustomizationSheet instead of _addToCart directly
-                      // Also fixed the comma issue at the end of this line
                       onPressed: item.isSoldOut
                           ? null
                           : () => _showCustomizationSheet(item),
