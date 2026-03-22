@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/menu_item_model.dart';
 import '../../models/order_model.dart';
+import '../../models/table_model.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -23,12 +24,11 @@ class DatabaseService {
         'is_sold_out': isSoldOut,
       });
     } catch (e) {
-      print("Error updating status: $e");
+      print("Error updating status: \$e");
       rethrow;
     }
   }
 
-  // 3. CREATE NEW ORDER (FOR CUSTOMER)
   // 3. CREATE NEW ORDER (FOR CUSTOMER)
   Future<String> placeOrder(OrderModel order) async {
     try {
@@ -40,7 +40,7 @@ class DatabaseService {
 
       return docRef.id; // Return the generated ID
     } catch (e) {
-      print("Error placing order: $e");
+      print("Error placing order: \$e");
       rethrow;
     }
   }
@@ -64,8 +64,104 @@ class DatabaseService {
     try {
       await _db.collection('orders').doc(orderId).update({'status': newStatus});
     } catch (e) {
-      print("Error updating order status: $e");
+      print("Error updating order status: \$e");
       rethrow;
     }
+  }
+
+  // 6. ADD NEW MENU ITEM (FOR MANAGER)
+  Future<void> addMenuItem(MenuItemModel item) async {
+    try {
+      final docRef = _db.collection('menu_items').doc();
+      final data = item.toFirestore();
+      await docRef.set(data);
+    } catch (e) {
+      print("Error adding menu item: \$e");
+      rethrow;
+    }
+  }
+
+  // 6B. CLEAR ALL MENU ITEMS (FOR SEEDING)
+  Future<void> clearMenuItems() async {
+    final snapshot = await _db.collection('menu_items').get();
+    for (var doc in snapshot.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  // 7. GET ACTIVE ORDERS FOR WAITER (PENDING & READY)
+  Stream<List<OrderModel>> getActiveOrdersStream() {
+    return _db
+        .collection('orders')
+        .where('status', whereIn: ['pending', 'ready'])
+        .snapshots()
+        .map((snapshot) {
+          final orders = snapshot.docs.map((doc) {
+            return OrderModel.fromFirestore(doc.data(), doc.id);
+          }).toList();
+          
+          // Sort client-side to prevent Firestore composite index requirements
+          orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          return orders;
+        });
+  }
+
+  // 8. ADD NEW TABLE (FOR MANAGER)
+  Future<void> addTable(int tableNumber) async {
+    try {
+      final docRef = _db.collection('tables').doc();
+      final qrData = 'makanje://table/$tableNumber'; // Deep link or QR payload
+      final newTable = TableModel(
+        id: docRef.id,
+        tableNumber: tableNumber,
+        qrData: qrData,
+        createdAt: DateTime.now(),
+      );
+      await docRef.set(newTable.toFirestore());
+    } catch (e) {
+      print("Error adding table: $e");
+      rethrow;
+    }
+  }
+
+  // 9. GET TABLES STREAM (FOR MANAGER)
+  Stream<List<TableModel>> getTablesStream() {
+    return _db
+        .collection('tables')
+        .orderBy('table_number', descending: false)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs.map((doc) {
+            return TableModel.fromFirestore(doc.data(), doc.id);
+          }).toList();
+        });
+  }
+
+  // 10. GET ACTIVE ORDERS FOR A SPECIFIC TABLE (CUSTOMER)
+  Future<List<OrderModel>> getActiveOrdersForTable(int tableNumber) async {
+    final querySnapshot = await _db.collection('orders')
+        .where('table_number', isEqualTo: tableNumber)
+        .where('status', whereIn: ['pending', 'cooking', 'ready'])
+        .get();
+        
+    final orders = querySnapshot.docs.map((doc) => OrderModel.fromFirestore(doc.data(), doc.id)).toList();
+    orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return orders;
+  }
+
+  // 11. GET ALL PAID ORDERS FOR ANALYTICS (MANAGER)
+  Stream<List<OrderModel>> getPaidOrdersStream() {
+    return _db
+        .collection('orders')
+        .where('status', isEqualTo: 'paid')
+        .snapshots()
+        .map((snapshot) {
+          final orders = snapshot.docs.map((doc) {
+            return OrderModel.fromFirestore(doc.data(), doc.id);
+          }).toList();
+          
+          orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          return orders;
+        });
   }
 }

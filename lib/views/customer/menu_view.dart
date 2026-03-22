@@ -8,7 +8,8 @@ import 'split_bill_view.dart';
 import '../../data/services/database_service.dart';
 
 class MenuView extends StatefulWidget {
-  const MenuView({Key? key}) : super(key: key);
+  final int tableNumber;
+  const MenuView({Key? key, required this.tableNumber}) : super(key: key);
 
   @override
   State<MenuView> createState() => _MenuViewState();
@@ -26,6 +27,9 @@ class _MenuViewState extends State<MenuView> {
 
   // State to hold the IDs of the unpaid orders in Firebase
   final List<String> _unpaidOrderIds = [];
+
+  // State for category filtering
+  String _selectedCategory = 'All';
 
   // Add item to cart with quantity
   void _addToCart(
@@ -192,7 +196,7 @@ class _MenuViewState extends State<MenuView> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CartView(cartItems: _currentCart),
+        builder: (context) => CartView(cartItems: _currentCart, tableNumber: widget.tableNumber),
       ),
     );
 
@@ -208,51 +212,100 @@ class _MenuViewState extends State<MenuView> {
     }
   }
 
-  // Navigate directly to the Split Bill view using the unpaid bill items
-  void _navigateToSplitBill() {
-    if (_unpaidBill.isEmpty) return;
+  // Fetch active orders for the table and navigate to Split Bill view
+  void _navigateToSplitBill() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
 
-    double totalBill = 0.0;
-    for (var item in _unpaidBill) {
-      totalBill += item.totalPrice;
-    }
+    try {
+      final activeOrders = await _dbService.getActiveOrdersForTable(widget.tableNumber);
+      if (mounted) Navigator.pop(context); // Close loading dialog
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SplitBillView(
-          cartItems: _unpaidBill,
-          grandTotal: totalBill,
-          orderIds: _unpaidOrderIds,
-        ),
-      ),
-    ).then((isPaid) {
-      // If payment was successful, clear the local bill UI
-      if (isPaid == true) {
-        setState(() {
-          _unpaidBill.clear();
-          _unpaidOrderIds.clear();
+      if (activeOrders.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No active orders for this table.')),
+          );
+        }
+        return;
+      }
+
+      double totalBill = 0.0;
+      final List<CartItemModel> combinedItems = [];
+      final List<String> orderIds = [];
+
+      for (var order in activeOrders) {
+        orderIds.add(order.orderId);
+        totalBill += order.totalAmount;
+        for (var orderItem in order.items) {
+          combinedItems.add(
+            CartItemModel(
+              menuItem: MenuItemModel(
+                itemId: orderItem.itemId,
+                nameEn: orderItem.name,
+                nameMy: orderItem.name,
+                category: 'Order',
+                price: orderItem.priceAtTimeOfOrder,
+                imageUrl: '',
+                isSoldOut: false,
+                customizationOptions: [],
+                description: '',
+                allergens: [],
+              ),
+              specialRemarks: orderItem.specialRemarks,
+              quantity: orderItem.quantity,
+            ),
+          );
+        }
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SplitBillView(
+              cartItems: combinedItems,
+              grandTotal: totalBill,
+              orderIds: orderIds,
+            ),
+          ),
+        ).then((isPaid) {
+          if (isPaid == true) {
+            setState(() {
+              _unpaidBill.clear();
+              _unpaidOrderIds.clear();
+            });
+          }
         });
       }
-    });
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching orders: $e')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Makan Je Menu',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          'Table ${widget.tableNumber} Menu',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           // Receipt / Unpaid Bill Icon
-          if (_unpaidBill.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.receipt_long, color: Colors.green),
-              onPressed: _navigateToSplitBill,
-              tooltip: 'View Bill & Pay',
-            ),
+          IconButton(
+            icon: const Icon(Icons.receipt_long, color: Colors.green),
+            onPressed: _navigateToSplitBill,
+            tooltip: 'View Bill & Pay',
+          ),
 
           Stack(
             alignment: Alignment.center,
@@ -310,9 +363,9 @@ class _MenuViewState extends State<MenuView> {
             );
           }
 
-          final menuItems = snapshot.data ?? [];
+          final allMenuItems = snapshot.data ?? [];
 
-          if (menuItems.isEmpty) {
+          if (allMenuItems.isEmpty) {
             return const Center(
               child: Text(
                 'Menu is currently empty.',
@@ -321,21 +374,75 @@ class _MenuViewState extends State<MenuView> {
             );
           }
 
-          return Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.75,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
+          final categories = ['All'];
+          for (var item in allMenuItems) {
+            if (!categories.contains(item.category)) {
+              categories.add(item.category);
+            }
+          }
+
+          final displayedItems = _selectedCategory == 'All' 
+              ? allMenuItems 
+              : allMenuItems.where((item) => item.category == _selectedCategory).toList();
+
+          return Column(
+            children: [
+              // Category Filter Row
+              Container(
+                height: 60,
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                  ]
+                ),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final isSelected = category == _selectedCategory;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0, top: 10, bottom: 10),
+                      child: ChoiceChip(
+                        label: Text(category, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                        selected: isSelected,
+                        selectedColor: Theme.of(context).primaryColor,
+                        labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87),
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() {
+                              _selectedCategory = category;
+                            });
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
               ),
-              itemCount: menuItems.length,
-              itemBuilder: (context, index) {
-                final item = menuItems[index];
-                return _buildMenuCard(context, item);
-              },
-            ),
+              
+              // Menu Grid
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.75,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                    ),
+                    itemCount: displayedItems.length,
+                    itemBuilder: (context, index) {
+                      final item = displayedItems[index];
+                      return _buildMenuCard(context, item);
+                    },
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -353,17 +460,17 @@ class _MenuViewState extends State<MenuView> {
         children: [
           Expanded(
             flex: 6,
-            child: Image.network(
-              item.imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(
-                  Icons.broken_image,
-                  size: 50,
-                  color: Colors.grey,
-                );
-              },
-            ),
+            child: item.imageUrl.startsWith('http')
+                ? Image.network(
+                    item.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.fastfood, size: 50, color: Colors.grey),
+                  )
+                : Image.asset(
+                    item.imageUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
+                  ),
           ),
           Expanded(
             flex: 4,

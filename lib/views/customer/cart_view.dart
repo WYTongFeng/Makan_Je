@@ -2,15 +2,15 @@
 
 import 'package:flutter/material.dart';
 import '../../models/cart_item_model.dart';
-import 'split_bill_view.dart';
 import '../../models/order_model.dart';
 import '../../data/services/database_service.dart';
 
 class CartView extends StatefulWidget {
   // Passing mock cart items for UI testing
   final List<CartItemModel> cartItems;
+  final int tableNumber;
 
-  const CartView({Key? key, required this.cartItems}) : super(key: key);
+  const CartView({Key? key, required this.cartItems, required this.tableNumber}) : super(key: key);
 
   @override
   State<CartView> createState() => _CartViewState();
@@ -183,7 +183,7 @@ class _CartViewState extends State<CartView> {
                           // 2. Construct the OrderModel
                           final newOrder = OrderModel(
                             orderId: '', // Firebase will generate the actual ID
-                            tableNumber: 1, // Mock table number
+                            tableNumber: widget.tableNumber, // Dynamic table context
                             status: 'pending',
                             createdAt: DateTime.now(),
                             totalAmount: _calculateGrandTotal(),
