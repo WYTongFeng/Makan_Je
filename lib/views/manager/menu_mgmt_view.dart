@@ -153,30 +153,62 @@ class MenuMgmtView extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // Toggle Switch
+                      // Actions
                       Column(
                         children: [
-                          Text(
-                            item.isSoldOut ? 'SOLD OUT' : 'AVAILABLE',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: item.isSoldOut ? Colors.red : Colors.green,
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit, color: Colors.blue),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => MenuItemFormView(existingItem: item),
+                                    ),
+                                  );
+                                },
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.all(8),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: AppTheme.darkRed),
+                                onPressed: () => _showDeleteConfirmation(context, item),
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.all(8),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Switch(
-                            value: !item.isSoldOut,
-                            activeColor: Colors.white,
-                            activeTrackColor: Colors.green,
-                            inactiveThumbColor: Colors.white,
-                            inactiveTrackColor: Colors.red.shade300,
-                            onChanged: (bool value) async {
-                              await _viewModel.toggleItemAvailability(
-                                item.itemId,
-                                item.isSoldOut,
-                              );
-                            },
+                          const SizedBox(height: 8),
+                          Column(
+                            children: [
+                              Text(
+                                item.isSoldOut ? 'SOLD OUT' : 'AVAILABLE',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: item.isSoldOut ? Colors.red : Colors.green,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              SizedBox(
+                                height: 35,
+                                child: Switch(
+                                  value: !item.isSoldOut,
+                                  activeColor: Colors.white,
+                                  activeTrackColor: Colors.green,
+                                  inactiveThumbColor: Colors.white,
+                                  inactiveTrackColor: Colors.red.shade300,
+                                  onChanged: (bool value) async {
+                                    await _viewModel.toggleItemAvailability(
+                                      item.itemId,
+                                      item.isSoldOut,
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -199,6 +231,44 @@ class MenuMgmtView extends StatelessWidget {
         icon: const Icon(Icons.add, color: AppTheme.white),
         label: const Text('Add Menu Item', style: TextStyle(color: AppTheme.white, fontWeight: FontWeight.bold)),
       ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, MenuItemModel item) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Delete'),
+          content: Text('Are you sure you want to delete ${item.nameEn}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                try {
+                  await _viewModel.deleteItem(item.itemId);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Item deleted successfully'))
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'))
+                    );
+                  }
+                }
+              },
+              child: const Text('Delete', style: TextStyle(color: AppTheme.darkRed)),
+            ),
+          ],
+        );
+      },
     );
   }
 }

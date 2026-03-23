@@ -4,7 +4,8 @@ import '../../models/menu_item_model.dart';
 import '../../view_models/manager_view_model.dart';
 
 class MenuItemFormView extends StatefulWidget {
-  const MenuItemFormView({Key? key}) : super(key: key);
+  final MenuItemModel? existingItem;
+  const MenuItemFormView({Key? key, this.existingItem}) : super(key: key);
 
   @override
   State<MenuItemFormView> createState() => _MenuItemFormViewState();
@@ -14,15 +15,29 @@ class _MenuItemFormViewState extends State<MenuItemFormView> {
   final _formKey = GlobalKey<FormState>();
   final ManagerViewModel _viewModel = ManagerViewModel();
   
-  final _nameController = TextEditingController();
-  final _nameMyController = TextEditingController(); // Added Malay Name
-  final _priceController = TextEditingController();
-  final _categoryController = TextEditingController();
-  final _descController = TextEditingController();
-  final _imageController = TextEditingController();
-  final _remarkController = TextEditingController(); // Added Remark/Customization
+  late final TextEditingController _nameController;
+  late final TextEditingController _nameMyController; 
+  late final TextEditingController _priceController;
+  late final TextEditingController _categoryController;
+  late final TextEditingController _descController;
+  late final TextEditingController _imageController;
+  late final TextEditingController _remarkController; 
 
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.existingItem?.nameEn);
+    _nameMyController = TextEditingController(text: widget.existingItem?.nameMy);
+    _priceController = TextEditingController(text: widget.existingItem?.price.toString());
+    _categoryController = TextEditingController(text: widget.existingItem?.category);
+    _descController = TextEditingController(text: widget.existingItem?.description);
+    _imageController = TextEditingController(text: widget.existingItem?.imageUrl);
+    _remarkController = TextEditingController(
+      text: widget.existingItem?.customizationOptions.join(', ')
+    );
+  }
 
   @override
   void dispose() {
@@ -41,26 +56,37 @@ class _MenuItemFormViewState extends State<MenuItemFormView> {
     
     setState(() => _isLoading = true);
 
-    final newItem = MenuItemModel(
-      itemId: '', // Handled by Firestore via auto-generated ID
+    final itemData = MenuItemModel(
+      itemId: widget.existingItem?.itemId ?? '', 
       nameEn: _nameController.text.trim(),
       nameMy: _nameMyController.text.trim(),
       description: _descController.text.trim(),
       price: double.tryParse(_priceController.text) ?? 0.0,
       category: _categoryController.text.trim(),
       imageUrl: _imageController.text.trim(),
-      isSoldOut: false,
-      allergens: [],
+      isSoldOut: widget.existingItem?.isSoldOut ?? false,
+      allergens: widget.existingItem?.allergens ?? [],
       customizationOptions: _remarkController.text.trim().isEmpty 
           ? [] 
           : _remarkController.text.split(',').map((e) => e.trim()).toList(),
     );
 
     try {
-      await _viewModel.addNewItem(newItem);
+      if (widget.existingItem == null) {
+        await _viewModel.addNewItem(itemData);
+      } else {
+        await _viewModel.updateItem(itemData);
+      }
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Menu Item Added successfully!', style: TextStyle(color: Colors.white)), backgroundColor: AppTheme.primaryOrange)
+          SnackBar(
+            content: Text(
+              widget.existingItem == null ? 'Menu Item Added successfully!' : 'Menu Item Updated successfully!',
+              style: const TextStyle(color: Colors.white)
+            ), 
+            backgroundColor: AppTheme.primaryOrange
+          )
         );
         Navigator.pop(context);
       }
@@ -77,10 +103,11 @@ class _MenuItemFormViewState extends State<MenuItemFormView> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.existingItem != null;
     return Scaffold(
       backgroundColor: AppTheme.paleYellow,
       appBar: AppBar(
-        title: const Text('Add Menu Item', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(isEditing ? 'Edit Menu Item' : 'Add Menu Item', style: const TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: AppTheme.white,
         foregroundColor: AppTheme.darkRed,
         elevation: 0,
@@ -117,7 +144,7 @@ class _MenuItemFormViewState extends State<MenuItemFormView> {
                   ),
                   child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Save Item', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.white)),
+                      : Text(isEditing ? 'Update Item' : 'Save Item', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.white)),
                 ),
               ),
             ],

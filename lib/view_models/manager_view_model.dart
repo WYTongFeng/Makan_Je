@@ -18,6 +18,16 @@ class ManagerViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateItem(MenuItemModel item) async {
+    await _dbService.updateMenuItem(item);
+    notifyListeners();
+  }
+
+  Future<void> deleteItem(String itemId) async {
+    await _dbService.deleteMenuItem(itemId);
+    notifyListeners();
+  }
+
   Future<void> registerStaffUser(String email, String password, String role) async {
     try {
       // 1. Initialize a secondary Firebase app to avoid logging out the current manager

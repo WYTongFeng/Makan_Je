@@ -164,4 +164,24 @@ class DatabaseService {
           return orders;
         });
   }
+
+  // 12. UPDATE EXISTING MENU ITEM (FOR MANAGER)
+  Future<void> updateMenuItem(MenuItemModel item) async {
+    try {
+      await _db.collection('menu_items').doc(item.itemId).update(item.toFirestore());
+    } catch (e) {
+      print("Error updating menu item: $e");
+      rethrow;
+    }
+  }
+
+  // 13. DELETE MENU ITEM (FOR MANAGER)
+  Future<void> deleteMenuItem(String itemId) async {
+    try {
+      await _db.collection('menu_items').doc(itemId).delete();
+    } catch (e) {
+      print("Error deleting menu item: $e");
+      rethrow;
+    }
+  }
 }
