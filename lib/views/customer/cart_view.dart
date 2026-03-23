@@ -125,13 +125,32 @@ class _CartViewState extends State<CartView> {
                 ],
               ),
             ),
-            // Quantity Indicator
-            Text(
-              'x${cartItem.quantity}',
-              style: const TextStyle(
-                fontSize: 16.0,
-                fontWeight: FontWeight.bold,
-              ),
+            // Action & Quantity
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'x${cartItem.quantity}',
+                  style: const TextStyle(
+                    fontSize: 16.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  onPressed: () {
+                    setState(() {
+                      widget.cartItems.remove(cartItem);
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${cartItem.menuItem.nameEn} removed from cart.'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),
