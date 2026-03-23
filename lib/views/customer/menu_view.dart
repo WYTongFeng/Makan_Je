@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../models/menu_item_model.dart';
 import '../../models/cart_item_model.dart';
+import '../../models/order_model.dart'; // Ensure OrderModel is imported
 import 'cart_view.dart';
 import 'split_bill_view.dart';
 import '../../data/services/database_service.dart';
@@ -22,13 +23,7 @@ class _MenuViewState extends State<MenuView> {
   // Temporary local state to hold cart items before State Management is implemented
   final List<CartItemModel> _currentCart = [];
 
-  // State to hold placed orders that haven't been paid yet
-  final List<CartItemModel> _unpaidBill = [];
-
-  // State to hold the IDs of the unpaid orders in Firebase
-  final List<String> _unpaidOrderIds = [];
-
-  // State for category filtering
+  // State to hold category filtering
   String _selectedCategory = 'All';
 
   // Add item to cart with quantity
@@ -196,19 +191,19 @@ class _MenuViewState extends State<MenuView> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CartView(cartItems: _currentCart, tableNumber: widget.tableNumber),
+        builder: (context) =>
+            CartView(cartItems: _currentCart, tableNumber: widget.tableNumber),
       ),
     );
 
     // If result is a String, it means the order was placed and we got an ID back
     if (result is String) {
       setState(() {
-        _unpaidBill.addAll(_currentCart);
-        _unpaidOrderIds.add(result); // Save the order ID
-        _currentCart.clear();
+        _currentCart.clear(); // Clear the local cart
       });
-    } else {
-      setState(() {});
+      // CRITICAL: Don't navigate to payment manually.
+      // Call _navigateToSplitBill to fetch FRESH data from Firebase.
+      _navigateToSplitBill();
     }
   }
 
@@ -221,15 +216,17 @@ class _MenuViewState extends State<MenuView> {
     );
 
     try {
-      final activeOrders = await _dbService.getActiveOrdersForTable(widget.tableNumber);
-      if (mounted) Navigator.pop(context); // Close loading dialog
+      final activeOrders = await _dbService.getActiveOrdersForTable(
+        widget.tableNumber,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
 
       if (activeOrders.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No active orders for this table.')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No active orders for this table.')),
+        );
         return;
       }
 
@@ -240,7 +237,10 @@ class _MenuViewState extends State<MenuView> {
       for (var order in activeOrders) {
         orderIds.add(order.orderId);
         totalBill += order.totalAmount;
-        for (var orderItem in order.items) {
+
+        // Use loop with index to track item position in Firebase array
+        for (int i = 0; i < order.items.length; i++) {
+          var orderItem = order.items[i];
           combinedItems.add(
             CartItemModel(
               menuItem: MenuItemModel(
@@ -250,9 +250,11 @@ class _MenuViewState extends State<MenuView> {
                 category: 'Order',
                 price: orderItem.priceAtTimeOfOrder,
                 imageUrl: '',
-                isSoldOut: false,
+                // SYNC: Map Firebase 'isPaid' to UI 'isSoldOut' for graying out logic
+                isSoldOut: orderItem.isPaid,
+                // Hack: Inject "OrderId|ItemIndex" so SplitBillView knows which item to update
+                description: "${order.orderId}|$i",
                 customizationOptions: [],
-                description: '',
                 allergens: [],
               ),
               specialRemarks: orderItem.specialRemarks,
@@ -272,21 +274,14 @@ class _MenuViewState extends State<MenuView> {
               orderIds: orderIds,
             ),
           ),
-        ).then((isPaid) {
-          if (isPaid == true) {
-            setState(() {
-              _unpaidBill.clear();
-              _unpaidOrderIds.clear();
-            });
-          }
-        });
+        );
       }
     } catch (e) {
-      if (mounted) Navigator.pop(context);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching orders: $e')),
-        );
+        Navigator.pop(context);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching orders: $e')));
       }
     }
   }
@@ -381,9 +376,11 @@ class _MenuViewState extends State<MenuView> {
             }
           }
 
-          final displayedItems = _selectedCategory == 'All' 
-              ? allMenuItems 
-              : allMenuItems.where((item) => item.category == _selectedCategory).toList();
+          final displayedItems = _selectedCategory == 'All'
+              ? allMenuItems
+              : allMenuItems
+                    .where((item) => item.category == _selectedCategory)
+                    .toList();
 
           return Column(
             children: [
@@ -394,8 +391,12 @@ class _MenuViewState extends State<MenuView> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
-                  ]
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
@@ -404,12 +405,25 @@ class _MenuViewState extends State<MenuView> {
                     final category = categories[index];
                     final isSelected = category == _selectedCategory;
                     return Padding(
-                      padding: const EdgeInsets.only(right: 8.0, top: 10, bottom: 10),
+                      padding: const EdgeInsets.only(
+                        right: 8.0,
+                        top: 10,
+                        bottom: 10,
+                      ),
                       child: ChoiceChip(
-                        label: Text(category, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                        label: Text(
+                          category,
+                          style: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
                         selected: isSelected,
                         selectedColor: Theme.of(context).primaryColor,
-                        labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black87),
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black87,
+                        ),
                         onSelected: (selected) {
                           if (selected) {
                             setState(() {
@@ -422,18 +436,19 @@ class _MenuViewState extends State<MenuView> {
                   },
                 ),
               ),
-              
+
               // Menu Grid
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.75,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.75,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
                     itemCount: displayedItems.length,
                     itemBuilder: (context, index) {
                       final item = displayedItems[index];
@@ -464,12 +479,20 @@ class _MenuViewState extends State<MenuView> {
                 ? Image.network(
                     item.imageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.fastfood, size: 50, color: Colors.grey),
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.fastfood,
+                      size: 50,
+                      color: Colors.grey,
+                    ),
                   )
                 : Image.asset(
                     item.imageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.image_not_supported,
+                      size: 50,
+                      color: Colors.grey,
+                    ),
                   ),
           ),
           Expanded(

@@ -51,11 +51,15 @@ class _LandingViewState extends State<LandingView> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator(color: AppTheme.primaryOrange)),
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppTheme.primaryOrange),
+      ),
     );
 
     try {
-      final activeOrders = await DatabaseService().getActiveOrdersForTable(_activeTableNumber!);
+      final activeOrders = await DatabaseService().getActiveOrdersForTable(
+        _activeTableNumber!,
+      );
       if (mounted) Navigator.pop(context); // close loader
 
       if (activeOrders.isEmpty) {
@@ -66,7 +70,10 @@ class _LandingViewState extends State<LandingView> {
         // Unpaid items exist! Block exit and show Bill
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please pay your active bill before leaving!'), backgroundColor: Colors.red),
+            const SnackBar(
+              content: Text('Please pay your active bill before leaving!'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
 
@@ -77,7 +84,10 @@ class _LandingViewState extends State<LandingView> {
         for (var order in activeOrders) {
           orderIds.add(order.orderId);
           totalBill += order.totalAmount;
-          for (var orderItem in order.items) {
+
+          // Use a for loop with an index to ensure complete synchronization with the MenuView's logic.
+          for (int i = 0; i < order.items.length; i++) {
+            var orderItem = order.items[i];
             combinedItems.add(
               CartItemModel(
                 menuItem: MenuItemModel(
@@ -87,9 +97,11 @@ class _LandingViewState extends State<LandingView> {
                   category: 'Order',
                   price: orderItem.priceAtTimeOfOrder,
                   imageUrl: '',
-                  isSoldOut: false,
+                  // Synchronize payment status, making paid items grayed out and unavailable.
+                  isSoldOut: orderItem.isPaid,
+                  // Inject key strings to ensure correct payment even when checking out.
+                  description: "${order.orderId}|$i",
                   customizationOptions: [],
-                  description: '',
                   allergens: [],
                 ),
                 specialRemarks: orderItem.specialRemarks,
@@ -121,9 +133,9 @@ class _LandingViewState extends State<LandingView> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error validating session: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error validating session: $e')));
       }
     }
   }
@@ -137,7 +149,7 @@ class _LandingViewState extends State<LandingView> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Spacer(),
-            
+
             // App Logo
             Image.asset(
               'assets/images/logo.png',
@@ -147,12 +159,9 @@ class _LandingViewState extends State<LandingView> {
             const SizedBox(height: 10),
             const Text(
               'Simply Eat. Scan to Order.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
-            
+
             const SizedBox(height: 50),
 
             if (_activeTableNumber != null) ...[
@@ -164,7 +173,11 @@ class _LandingViewState extends State<LandingView> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
                   ],
                 ),
                 child: Column(
@@ -172,11 +185,18 @@ class _LandingViewState extends State<LandingView> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.table_restaurant, color: AppTheme.primaryOrange),
+                        const Icon(
+                          Icons.table_restaurant,
+                          color: AppTheme.primaryOrange,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Currently at Table $_activeTableNumber',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.darkGrey),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkGrey,
+                          ),
                         ),
                       ],
                     ),
@@ -188,14 +208,28 @@ class _LandingViewState extends State<LandingView> {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => MenuView(tableNumber: _activeTableNumber!)),
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  MenuView(tableNumber: _activeTableNumber!),
+                            ),
                           ).then((_) => _loadSession());
                         },
-                        icon: const Icon(Icons.restaurant_menu, color: Colors.white),
-                        label: const Text('Return to Menu & Orders', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        icon: const Icon(
+                          Icons.restaurant_menu,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Return to Menu & Orders',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primaryOrange,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
@@ -203,16 +237,24 @@ class _LandingViewState extends State<LandingView> {
                     TextButton(
                       onPressed: () => _guardActiveSession(() {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Session ended successfully.')),
+                          const SnackBar(
+                            content: Text('Session ended successfully.'),
+                          ),
                         );
                       }),
-                      child: const Text('Checkout / End Session', style: TextStyle(color: Colors.grey, decoration: TextDecoration.underline)),
+                      child: const Text(
+                        'Checkout / End Session',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Secondary Scan New QR Button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40.0),
@@ -224,15 +266,31 @@ class _LandingViewState extends State<LandingView> {
                       _guardActiveSession(() {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const ScanQrView()),
+                          MaterialPageRoute(
+                            builder: (context) => const ScanQrView(),
+                          ),
                         ).then((_) => _loadSession());
                       });
                     },
-                    icon: const Icon(Icons.qr_code_scanner, color: AppTheme.primaryOrange),
-                    label: const Text('Scan New Table', style: TextStyle(color: AppTheme.primaryOrange, fontWeight: FontWeight.bold)),
+                    icon: const Icon(
+                      Icons.qr_code_scanner,
+                      color: AppTheme.primaryOrange,
+                    ),
+                    label: const Text(
+                      'Scan New Table',
+                      style: TextStyle(
+                        color: AppTheme.primaryOrange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppTheme.primaryOrange, width: 2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: const BorderSide(
+                        color: AppTheme.primaryOrange,
+                        width: 2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
@@ -248,10 +306,15 @@ class _LandingViewState extends State<LandingView> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const ScanQrView()),
+                        MaterialPageRoute(
+                          builder: (context) => const ScanQrView(),
+                        ),
                       ).then((_) => _loadSession());
                     },
-                    icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+                    icon: const Icon(
+                      Icons.qr_code_scanner,
+                      color: Colors.white,
+                    ),
                     label: const Text(
                       'Scan Table QR to Order',
                       style: TextStyle(
@@ -278,11 +341,22 @@ class _LandingViewState extends State<LandingView> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const MapLocationView()),
+                  MaterialPageRoute(
+                    builder: (context) => const MapLocationView(),
+                  ),
                 );
               },
-              icon: const Icon(Icons.location_on, color: AppTheme.primaryOrange),
-              label: const Text('Find Us on Google Maps', style: TextStyle(color: AppTheme.primaryOrange, fontWeight: FontWeight.bold)),
+              icon: const Icon(
+                Icons.location_on,
+                color: AppTheme.primaryOrange,
+              ),
+              label: const Text(
+                'Find Us on Google Maps',
+                style: TextStyle(
+                  color: AppTheme.primaryOrange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             const SizedBox(height: 10),
 

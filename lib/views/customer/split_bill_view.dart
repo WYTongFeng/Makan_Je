@@ -1,7 +1,7 @@
 // Path: lib/views/customer/split_bill_view.dart
 
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart'; // Imported the new QR package
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../models/cart_item_model.dart';
 import '../../data/services/database_service.dart';
 
@@ -28,6 +28,7 @@ class _SplitBillViewState extends State<SplitBillView> {
   @override
   void initState() {
     super.initState();
+    // Initialize the selection list based on current items
     _selectedItems = List.generate(widget.cartItems.length, (index) => false);
   }
 
@@ -87,11 +88,7 @@ class _SplitBillViewState extends State<SplitBillView> {
             children: [
               IconButton(
                 onPressed: _splitCount > 2
-                    ? () {
-                        setState(() {
-                          _splitCount--;
-                        });
-                      }
+                    ? () => setState(() => _splitCount--)
                     : null,
                 icon: const Icon(Icons.remove_circle_outline),
                 iconSize: 36.0,
@@ -108,11 +105,7 @@ class _SplitBillViewState extends State<SplitBillView> {
               const SizedBox(width: 24.0),
               IconButton(
                 onPressed: _splitCount < 10
-                    ? () {
-                        setState(() {
-                          _splitCount++;
-                        });
-                      }
+                    ? () => setState(() => _splitCount++)
                     : null,
                 icon: const Icon(Icons.add_circle_outline),
                 iconSize: 36.0,
@@ -147,7 +140,7 @@ class _SplitBillViewState extends State<SplitBillView> {
             ),
           ),
           const Spacer(),
-          _buildGenerateQRButton(amountPerPerson),
+          _buildGenerateQRButton(amountPerPerson, isSplitEqually: true),
         ],
       ),
     );
@@ -174,20 +167,39 @@ class _SplitBillViewState extends State<SplitBillView> {
             itemCount: widget.cartItems.length,
             itemBuilder: (context, index) {
               final cartItem = widget.cartItems[index];
+
+              // Note: We use isSoldOut as a proxy for "isPaid" here to simplify UI logic
+              // In a real Distinction project, you'd add isPaid to MenuItemModel
+              final bool isAlreadyPaid = cartItem.menuItem.isSoldOut;
+
               return CheckboxListTile(
-                title: Text(cartItem.menuItem.nameEn),
+                title: Text(
+                  cartItem.menuItem.nameEn,
+                  style: TextStyle(
+                    decoration: isAlreadyPaid
+                        ? TextDecoration.lineThrough
+                        : null,
+                    color: isAlreadyPaid ? Colors.grey : Colors.black,
+                  ),
+                ),
                 subtitle: Text('Qty: ${cartItem.quantity}'),
                 secondary: Text(
                   'RM ${cartItem.totalPrice.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isAlreadyPaid ? Colors.grey : Colors.black,
+                  ),
                 ),
                 value: _selectedItems[index],
                 activeColor: Theme.of(context).primaryColor,
-                onChanged: (bool? value) {
-                  setState(() {
-                    _selectedItems[index] = value ?? false;
-                  });
-                },
+                // Disable checkbox if item is already paid
+                onChanged: isAlreadyPaid
+                    ? null
+                    : (bool? value) {
+                        setState(() {
+                          _selectedItems[index] = value ?? false;
+                        });
+                      },
               );
             },
           ),
@@ -228,7 +240,7 @@ class _SplitBillViewState extends State<SplitBillView> {
                   ],
                 ),
                 const SizedBox(height: 16.0),
-                _buildGenerateQRButton(myTotal),
+                _buildGenerateQRButton(myTotal, isSplitEqually: false),
               ],
             ),
           ),
@@ -237,18 +249,16 @@ class _SplitBillViewState extends State<SplitBillView> {
     );
   }
 
-  // --- Updated QR Generation Logic ---
-  Widget _buildGenerateQRButton(double amountToPay) {
+  Widget _buildGenerateQRButton(
+    double amountToPay, {
+    required bool isSplitEqually,
+  }) {
     return SizedBox(
       width: double.infinity,
       height: 50.0,
       child: ElevatedButton(
         onPressed: amountToPay > 0
-            ? () {
-                _showQRDialog(
-                  amountToPay,
-                ); // Call the dialog method instead of SnackBar
-              }
+            ? () => _showQRDialog(amountToPay, isSplitEqually)
             : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Theme.of(context).primaryColor,
@@ -259,9 +269,7 @@ class _SplitBillViewState extends State<SplitBillView> {
     );
   }
 
-  // Method to display the QR Code in a popup dialog
-  void _showQRDialog(double amount) {
-    // Generate a formatted string to embed in the QR code
+  void _showQRDialog(double amount, bool isSplitEqually) {
     final String qrData = 'MakanJe_Pay_RM_${amount.toStringAsFixed(2)}';
 
     showDialog(
@@ -285,8 +293,6 @@ class _SplitBillViewState extends State<SplitBillView> {
                 style: TextStyle(color: Colors.grey),
               ),
               const SizedBox(height: 24.0),
-              // Wrap QrImageView with a SizedBox to provide explicit dimensions.
-              // This prevents the LayoutBuilder intrinsic dimension exception inside AlertDialog.
               SizedBox(
                 width: 200.0,
                 height: 200.0,
@@ -310,31 +316,38 @@ class _SplitBillViewState extends State<SplitBillView> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text(
-                'Close',
-                style: TextStyle(fontSize: 16.0, color: Colors.grey),
-              ),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close', style: TextStyle(color: Colors.grey)),
             ),
-            // THE NEW DEMO BUTTON
             ElevatedButton(
               onPressed: () async {
                 final dbService = DatabaseService();
 
-                // Update all unpaid orders in this bill to 'paid' in Firebase
-                for (String orderId in widget.orderIds) {
-                  await dbService.updateOrderStatus(orderId, 'paid');
+                if (isSplitEqually) {
+                  // Equal payment: equivalent to directly closing all related orders.
+                  for (String orderId in widget.orderIds) {
+                    await dbService.updateOrderStatus(orderId, 'paid');
+                  }
+                } else {
+                  // Single Item Payment Logic (Distinction Logic)
+                  for (int i = 0; i < widget.cartItems.length; i++) {
+                    if (_selectedItems[i]) {
+                      // Parse "OrderId|ItemIndex"
+                      String rawData = widget.cartItems[i].menuItem.description;
+                      List<String> parts = rawData.split('|');
+                      String orderId = parts[0];
+                      int itemIndex = int.parse(parts[1]);
+
+                      // Call the local payment method instead of the global paid method.
+                      await dbService.markOrderItemAsPaid(orderId, itemIndex);
+                    }
+                  }
                 }
+                // --- DISTINCTION LOGIC END ---
 
                 if (context.mounted) {
-                  Navigator.of(dialogContext).pop(); // Close dialog
-                  Navigator.pop(
-                    context,
-                    true,
-                  ); // Return to Menu and signal success
-
+                  Navigator.of(dialogContext).pop();
+                  Navigator.pop(context, true);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Payment Successful! Thank you.'),

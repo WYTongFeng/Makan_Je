@@ -6,6 +6,7 @@ class OrderItem {
   final int quantity;
   final double priceAtTimeOfOrder;
   final List<String> specialRemarks;
+  final bool isPaid;
 
   OrderItem({
     required this.itemId,
@@ -13,6 +14,8 @@ class OrderItem {
     required this.quantity,
     required this.priceAtTimeOfOrder,
     required this.specialRemarks,
+    this.isPaid =
+        false, // 2. Default to false so leader's "Add Item" still works
   });
 
   factory OrderItem.fromMap(Map<String, dynamic> data) {
@@ -22,6 +25,7 @@ class OrderItem {
       quantity: data['quantity'] ?? 1,
       priceAtTimeOfOrder: (data['price_at_time_of_order'] ?? 0.0).toDouble(),
       specialRemarks: List<String>.from(data['special_remarks'] ?? []),
+      isPaid: data['is_paid'] ?? false,
     );
   }
 
@@ -32,6 +36,7 @@ class OrderItem {
       'quantity': quantity,
       'price_at_time_of_order': priceAtTimeOfOrder,
       'special_remarks': specialRemarks,
+      'is_paid': isPaid, // 4. Save the status
     };
   }
 }

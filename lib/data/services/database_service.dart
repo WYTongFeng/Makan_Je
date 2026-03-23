@@ -99,7 +99,7 @@ class DatabaseService {
           final orders = snapshot.docs.map((doc) {
             return OrderModel.fromFirestore(doc.data(), doc.id);
           }).toList();
-          
+
           // Sort client-side to prevent Firestore composite index requirements
           orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
           return orders;
@@ -139,12 +139,15 @@ class DatabaseService {
 
   // 10. GET ACTIVE ORDERS FOR A SPECIFIC TABLE (CUSTOMER)
   Future<List<OrderModel>> getActiveOrdersForTable(int tableNumber) async {
-    final querySnapshot = await _db.collection('orders')
+    final querySnapshot = await _db
+        .collection('orders')
         .where('table_number', isEqualTo: tableNumber)
         .where('status', whereIn: ['pending', 'cooking', 'ready'])
         .get();
-        
-    final orders = querySnapshot.docs.map((doc) => OrderModel.fromFirestore(doc.data(), doc.id)).toList();
+
+    final orders = querySnapshot.docs
+        .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
+        .toList();
     orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return orders;
   }
@@ -159,7 +162,7 @@ class DatabaseService {
           final orders = snapshot.docs.map((doc) {
             return OrderModel.fromFirestore(doc.data(), doc.id);
           }).toList();
-          
+
           orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
           return orders;
         });
@@ -168,7 +171,10 @@ class DatabaseService {
   // 12. UPDATE EXISTING MENU ITEM (FOR MANAGER)
   Future<void> updateMenuItem(MenuItemModel item) async {
     try {
-      await _db.collection('menu_items').doc(item.itemId).update(item.toFirestore());
+      await _db
+          .collection('menu_items')
+          .doc(item.itemId)
+          .update(item.toFirestore());
     } catch (e) {
       print("Error updating menu item: $e");
       rethrow;
@@ -181,6 +187,74 @@ class DatabaseService {
       await _db.collection('menu_items').doc(itemId).delete();
     } catch (e) {
       print("Error deleting menu item: $e");
+      rethrow;
+    }
+  }
+
+  // lib/data/services/database_service.dart
+
+  // Update payment status for specific items within an order
+  Future<void> updateItemsAsPaid(String orderId, List<int> itemIndices) async {
+    try {
+      DocumentReference orderRef = _db.collection('orders').doc(orderId);
+
+      // 1. Get the latest data from Firestore
+      DocumentSnapshot doc = await orderRef.get();
+      if (!doc.exists) return;
+
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      List<dynamic> items = List.from(data['items']);
+
+      // 2. Mark selected indices as paid
+      for (int index in itemIndices) {
+        if (index < items.length) {
+          items[index]['is_paid'] = true;
+        }
+      }
+
+      // 3. Update the whole list back to Firestore
+      await orderRef.update({'items': items});
+
+      // 4. Distinction Point: Check if ALL items in this order are paid
+      bool allPaid = items.every((item) => item['is_paid'] == true);
+      if (allPaid) {
+        await orderRef.update({'status': 'paid'}); // Auto-close the order
+      }
+    } catch (e) {
+      print("Error updating items payment: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> markOrderItemAsPaid(String orderId, int itemIndex) async {
+    try {
+      DocumentReference orderRef = _db.collection('orders').doc(orderId);
+      DocumentSnapshot doc = await orderRef.get();
+
+      if (!doc.exists) return;
+
+      // 1. Retrieve current order data
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      List<dynamic> items = List.from(data['items']);
+
+      // 2. Mark the specified item as paid.
+      if (itemIndex < items.length) {
+        items[itemIndex]['is_paid'] = true;
+      }
+
+      // 3. Check if all the dishes have been paid for.
+      bool allPaid = items.every((item) => item['is_paid'] == true);
+
+      // 4. Update Firebase
+      Map<String, dynamic> updates = {'items': items};
+      if (allPaid) {
+        updates['status'] =
+            'paid'; // The overall status will only be changed after all payments are completed.
+      }
+
+      await orderRef.update(updates);
+    } catch (e) {
+      print("Error marking item as paid: $e");
       rethrow;
     }
   }
