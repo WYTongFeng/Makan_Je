@@ -63,20 +63,35 @@ class _CartViewState extends State<CartView> {
             // Item Image
             ClipRRect(
               borderRadius: BorderRadius.circular(8.0),
-              child: Image.network(
-                cartItem.menuItem.imageUrl,
-                width: 60,
-                height: 60,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 60,
-                    height: 60,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.broken_image, color: Colors.grey),
-                  );
-                },
-              ),
+              child: cartItem.menuItem.imageUrl.startsWith('http')
+                  ? Image.network(
+                      cartItem.menuItem.imageUrl,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 60,
+                          height: 60,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        );
+                      },
+                    )
+                  : Image.asset(
+                      cartItem.menuItem.imageUrl,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 60,
+                          height: 60,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                        );
+                      },
+                    ),
             ),
             const SizedBox(width: 12.0),
             // Item Details
