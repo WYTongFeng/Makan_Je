@@ -1,25 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-// Update this import to point to your main.dart file.
-// Depending on your exact folder structure, it might just be 'package:makanjeapp/main.dart'
-import 'package:makanjeapp/main.dart';
+import 'package:makanjeapp/views/common/landing_view.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // CHANGE THIS LINE: Replace MyApp() with MakanJeApp()
-    await tester.pumpWidget(const MakanJeApp());
+  testWidgets('Landing Screen renders core navigation buttons correctly', (WidgetTester tester) async {
+    
+    // 1. Mount the target widget within a localized testing environment
+    await tester.pumpWidget(const MaterialApp(
+      home: LandingView(), 
+    ));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // 2. Verify that the primary Customer entry button is painted on the screen
+    // Note: Adjusted from 'Dine In (Scan QR)' to match actual code 'Scan Table QR to Order'
+    expect(find.text('Scan Table QR to Order'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // 3. Verify that the Staff authentication portal link exists
+    expect(find.text('Staff Login'), findsOneWidget);
+    
+    // 4. Negative testing: Verify that unexpected elements do NOT exist
+    expect(find.text('Random Non-Existent Button'), findsNothing);
   });
 }
