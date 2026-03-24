@@ -45,6 +45,8 @@ class _LandingViewState extends State<LandingView> {
   }
 
   // Guard mechanism to prevent exiting if orders are unpaid
+  // lib/views/common/landing_view.dart
+
   Future<void> _guardActiveSession(Function onClearAllowed) async {
     if (_activeTableNumber == null) return;
 
@@ -57,21 +59,27 @@ class _LandingViewState extends State<LandingView> {
     );
 
     try {
-      final activeOrders = await DatabaseService().getActiveOrdersForTable(
+      final allOrders = await DatabaseService().getActiveOrdersForTable(
         _activeTableNumber!,
       );
       if (mounted) Navigator.pop(context); // close loader
 
-      if (activeOrders.isEmpty) {
-        // Safe to leave table
+      // --- CRITICAL FIX: 检查是否真的有还没付钱的菜 ---
+      // 只有当订单列表中存在任何一个 orderItem.isPaid == false 时，才需要拦截
+      final bool hasUnpaidItems = allOrders.any(
+        (order) => order.items.any((item) => item.isPaid == false),
+      );
+
+      if (!hasUnpaidItems) {
+        // 如果所有菜都付过钱了，或者是根本没订单，直接放行
         await _clearSession();
         onClearAllowed();
       } else {
-        // Unpaid items exist! Block exit and show Bill
+        // 还有未付单品！拦截并显示账单
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Please pay your active bill before leaving!'),
+              content: Text('Please pay your remaining items before leaving!'),
               backgroundColor: Colors.red,
             ),
           );
@@ -81,11 +89,10 @@ class _LandingViewState extends State<LandingView> {
         final List<CartItemModel> combinedItems = [];
         final List<String> orderIds = [];
 
-        for (var order in activeOrders) {
+        for (var order in allOrders) {
           orderIds.add(order.orderId);
           totalBill += order.totalAmount;
 
-          // Use a for loop with an index to ensure complete synchronization with the MenuView's logic.
           for (int i = 0; i < order.items.length; i++) {
             var orderItem = order.items[i];
             combinedItems.add(
@@ -97,9 +104,9 @@ class _LandingViewState extends State<LandingView> {
                   category: 'Order',
                   price: orderItem.priceAtTimeOfOrder,
                   imageUrl: '',
-                  // Synchronize payment status, making paid items grayed out and unavailable.
+                  // 重要：这里的 isSoldOut 决定了在结账页是否变灰
                   isSoldOut: orderItem.isPaid,
-                  // Inject key strings to ensure correct payment even when checking out.
+                  // 重要：这里的 description 决定了结账时能否通过解析找到对应的 OrderItem
                   description: "${order.orderId}|$i",
                   customizationOptions: [],
                   allergens: [],
@@ -122,7 +129,7 @@ class _LandingViewState extends State<LandingView> {
               ),
             ),
           ).then((isPaid) {
-            // Once securely paid, allow them to check out
+            // 一旦在结账页成功支付了所有单品，返回时允许 End Session
             if (isPaid == true) {
               _clearSession();
               onClearAllowed();

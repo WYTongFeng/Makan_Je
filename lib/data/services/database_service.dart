@@ -142,12 +142,13 @@ class DatabaseService {
     final querySnapshot = await _db
         .collection('orders')
         .where('table_number', isEqualTo: tableNumber)
-        .where('status', whereIn: ['pending', 'cooking', 'ready'])
+        .where('status', whereIn: ['pending', 'cooking', 'ready', 'completed'])
         .get();
 
     final orders = querySnapshot.docs
         .map((doc) => OrderModel.fromFirestore(doc.data(), doc.id))
         .toList();
+
     orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return orders;
   }
