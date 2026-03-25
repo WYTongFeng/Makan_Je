@@ -64,18 +64,14 @@ class _LandingViewState extends State<LandingView> {
       );
       if (mounted) Navigator.pop(context); // close loader
 
-      // --- CRITICAL FIX: 检查是否真的有还没付钱的菜 ---
-      // 只有当订单列表中存在任何一个 orderItem.isPaid == false 时，才需要拦截
       final bool hasUnpaidItems = allOrders.any(
         (order) => order.items.any((item) => item.isPaid == false),
       );
 
       if (!hasUnpaidItems) {
-        // 如果所有菜都付过钱了，或者是根本没订单，直接放行
         await _clearSession();
         onClearAllowed();
       } else {
-        // 还有未付单品！拦截并显示账单
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -104,9 +100,7 @@ class _LandingViewState extends State<LandingView> {
                   category: 'Order',
                   price: orderItem.priceAtTimeOfOrder,
                   imageUrl: '',
-                  // 重要：这里的 isSoldOut 决定了在结账页是否变灰
                   isSoldOut: orderItem.isPaid,
-                  // 重要：这里的 description 决定了结账时能否通过解析找到对应的 OrderItem
                   description: "${order.orderId}|$i",
                   customizationOptions: [],
                   allergens: [],
@@ -129,7 +123,6 @@ class _LandingViewState extends State<LandingView> {
               ),
             ),
           ).then((isPaid) {
-            // 一旦在结账页成功支付了所有单品，返回时允许 End Session
             if (isPaid == true) {
               _clearSession();
               onClearAllowed();
